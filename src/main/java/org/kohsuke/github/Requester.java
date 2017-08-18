@@ -37,6 +37,7 @@ import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -286,10 +287,7 @@ class Requester {
             } catch (IOException e) {
                 try {
                     handleApiError(e);
-                } catch (HttpException e2) {
-                    if (e2.getResponseCode() >= 200) {
-                        throw e2;
-                    }
+                } catch (SocketException e2) {
                     if (retries > 0) {
                         retries = retries - 1;
                         try {
