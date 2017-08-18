@@ -284,9 +284,12 @@ class Requester {
                 }
                 return result;
             } catch (IOException e) {
-                try{
+                try {
                     handleApiError(e);
                 } catch (HttpException e2) {
+                    if (e2.getResponseCode() >= 200) {
+                        throw e2;
+                    }
                     if (retries > 0) {
                         retries = retries - 1;
                         try {
