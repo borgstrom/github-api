@@ -586,6 +586,7 @@ class Requester {
     }
 
     private <T> T parse(Class<T> type, T instance, int timeouts) throws IOException {
+        boolean shouldRetry = false;
         InputStreamReader r = null;
         int responseCode = -1;
         String responseMessage = null;
@@ -618,17 +619,27 @@ class Requester {
         } catch (IOException e) {
             if (e instanceof SocketTimeoutException && timeouts > 0) {
                 LOGGER.log(Level.INFO, "timed out accessing " + uc.getURL() + "; will try " + timeouts + " more time(s)", e);
-                try {
-                    Thread.sleep(10000);
-                } catch (InterruptedException _) {
-                    throw (IOException)new InterruptedIOException().initCause(e);
-                }
-                return parse(type, instance, timeouts - 1);
+                shouldRetry = true;
+            } else {
+                throw new HttpException(responseCode, responseMessage, uc.getURL(), e);
             }
-            throw new HttpException(responseCode, responseMessage, uc.getURL(), e);
         } finally {
-            IOUtils.closeQuietly(r);
+            if (!shouldRetry) {
+                IOUtils.closeQuietly(r);
+            }
         }
+
+        if (shouldRetry) {
+            try {
+                LOGGER.log(Level.INFO, "Sleeping for 10 seconds");
+                Thread.sleep(10000);
+            } catch (InterruptedException e) {
+                throw (IOException)new InterruptedIOException().initCause(e);
+            }
+            return parse(type, instance, timeouts - 1);
+        }
+
+        return null;
     }
 
     /**
