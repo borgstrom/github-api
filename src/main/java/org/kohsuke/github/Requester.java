@@ -284,16 +284,20 @@ class Requester {
                 }
                 return result;
             } catch (IOException e) {
-                if (retries > 0) {
-                    retries = retries - 1;
-                    try {
-                        LOGGER.log(Level.INFO, "Sleeping for 5 seconds");
-                        Thread.sleep(5000);
-                    } catch (InterruptedException _) {
-                        throw (IOException)new InterruptedIOException().initCause(e);
-                    }
-                } else {
+                try{
                     handleApiError(e);
+                } catch (HttpException e2) {
+                    if (retries > 0) {
+                        retries = retries - 1;
+                        try {
+                            LOGGER.log(Level.INFO, "Sleeping for 5 seconds");
+                            Thread.sleep(5000);
+                        } catch (InterruptedException _) {
+                            throw (IOException)new InterruptedIOException().initCause(e2);
+                        }
+                    } else {
+                        throw e2;
+                    }
                 }
             } finally {
                 noteRateLimit(tailApiUrl);
