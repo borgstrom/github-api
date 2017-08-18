@@ -256,6 +256,7 @@ class Requester {
             }
         }
 
+        int retries = 10;
         while (true) {// loop while API rate limit is hit
             setupConnection(root.getApiURL(tailApiUrl));
 
@@ -283,7 +284,17 @@ class Requester {
                 }
                 return result;
             } catch (IOException e) {
-                handleApiError(e);
+                if (retries > 0) {
+                    retries = retries - 1;
+                    try {
+                        LOGGER.log(Level.INFO, "Sleeping for 5 seconds");
+                        Thread.sleep(5000);
+                    } catch (InterruptedException _) {
+                        throw (IOException)new InterruptedIOException().initCause(e);
+                    }
+                } else {
+                    handleApiError(e);
+                }
             } finally {
                 noteRateLimit(tailApiUrl);
             }
@@ -582,17 +593,10 @@ class Requester {
     }
 
     private <T> T parse(Class<T> type, T instance) throws IOException {
-        return parse(type, instance, 18);
-    }
-
-    private <T> T parse(Class<T> type, T instance, int timeouts) throws IOException {
-        boolean shouldRetry = false;
         InputStreamReader r = null;
         int responseCode = -1;
-        String responseMessage = null;
         try {
             responseCode = uc.getResponseCode();
-            responseMessage = uc.getResponseMessage();
             if (responseCode == 304) {
                 return null;    // special case handling for 304 unmodified, as the content will be ""
             }
@@ -616,30 +620,9 @@ class Requester {
             // java.net.URLConnection handles 404 exception has FileNotFoundException, don't wrap exception in HttpException
             // to preserve backward compatibility
             throw e;
-        } catch (IOException e) {
-            if (e instanceof SocketTimeoutException && timeouts > 0) {
-                LOGGER.log(Level.INFO, "timed out accessing " + uc.getURL() + "; will try " + timeouts + " more time(s)", e);
-                shouldRetry = true;
-            } else {
-                throw new HttpException(responseCode, responseMessage, uc.getURL(), e);
-            }
         } finally {
-            if (!shouldRetry) {
-                IOUtils.closeQuietly(r);
-            }
+            IOUtils.closeQuietly(r);
         }
-
-        if (shouldRetry) {
-            try {
-                LOGGER.log(Level.INFO, "Sleeping for 10 seconds");
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {
-                throw (IOException)new InterruptedIOException().initCause(e);
-            }
-            return parse(type, instance, timeouts - 1);
-        }
-
-        return null;
     }
 
     /**
