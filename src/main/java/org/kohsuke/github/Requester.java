@@ -29,6 +29,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
@@ -581,7 +582,7 @@ class Requester {
     }
 
     private <T> T parse(Class<T> type, T instance) throws IOException {
-        return parse(type, instance, 2);
+        return parse(type, instance, 18);
     }
 
     private <T> T parse(Class<T> type, T instance, int timeouts) throws IOException {
@@ -617,6 +618,11 @@ class Requester {
         } catch (IOException e) {
             if (e instanceof SocketTimeoutException && timeouts > 0) {
                 LOGGER.log(Level.INFO, "timed out accessing " + uc.getURL() + "; will try " + timeouts + " more time(s)", e);
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException _) {
+                    throw (IOException)new InterruptedIOException().initCause(e);
+                }
                 return parse(type, instance, timeouts - 1);
             }
             throw new HttpException(responseCode, responseMessage, uc.getURL(), e);
